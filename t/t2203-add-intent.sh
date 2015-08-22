@@ -111,5 +111,39 @@ test_expect_success 'apply:check_preimage() not creating empty file' '
 	)
 '
 
+test_expect_success 'checkout ignores i-t-a' '
+	git init checkout &&
+	(
+		cd checkout &&
+		echo data >file &&
+		git add -N file &&
+		test_must_fail git checkout -- file &&
+		echo data >expected &&
+		test_cmp expected file
+	)
+'
+
+test_expect_success 'checkout-index ignores i-t-a' '
+	(
+		cd checkout &&
+		git checkout-index file &&
+		echo data >expected &&
+		test_cmp expected file
+	)
+'
+
+test_expect_success 'checkout-index --all ignores i-t-a' '
+	(
+		cd checkout &&
+		echo data >anotherfile &&
+		git add anotherfile &&
+		rm anotherfile &&
+		git checkout-index --all &&
+		echo data >expected &&
+		test_cmp expected file &&
+		test_cmp expected anotherfile
+	)
+'
+
 test_done
 

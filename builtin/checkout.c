@@ -300,6 +300,8 @@ static int checkout_paths(const struct checkout_opts *opts,
 			 * anything to this entry at all.
 			 */
 			continue;
+		if (ce_intent_to_add(ce))
+			continue;
 		/*
 		 * Either this entry came from the tree-ish we are
 		 * checking the paths out of, or we are checking out
