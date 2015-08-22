@@ -95,5 +95,21 @@ test_expect_success 'apply adds new file on i-t-a entry' '
 	)
 '
 
+test_expect_success 'apply:check_preimage() not creating empty file' '
+	git init check-preimage &&
+	(
+		cd check-preimage &&
+		echo oldcontent >newfile &&
+		git add newfile &&
+		echo newcontent >newfile &&
+		git diff >patch &&
+		rm .git/index &&
+		git add -N newfile &&
+		rm newfile &&
+		test_must_fail git apply -3 patch &&
+		! test -f newfile
+	)
+'
+
 test_done
 
