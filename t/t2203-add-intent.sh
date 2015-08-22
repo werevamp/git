@@ -82,5 +82,18 @@ test_expect_success 'cache-tree invalidates i-t-a paths' '
 	test_cmp expect actual
 '
 
+test_expect_success 'apply adds new file on i-t-a entry' '
+	git init apply &&
+	(
+		cd apply &&
+		echo newcontent >newfile &&
+		git add newfile &&
+		git diff --cached >patch &&
+		rm .git/index &&
+		git add -N newfile &&
+		git apply --cached patch
+	)
+'
+
 test_done
 

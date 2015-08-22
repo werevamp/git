@@ -3550,10 +3550,11 @@ static int check_to_create(const char *new_name, int ok_if_exists)
 {
 	struct stat nst;
 
-	if (check_index &&
-	    cache_name_pos(new_name, strlen(new_name)) >= 0 &&
-	    !ok_if_exists)
-		return EXISTS_IN_INDEX;
+	if (check_index && !ok_if_exists) {
+		int pos = cache_name_pos(new_name, strlen(new_name));
+		if (pos >= 0 && !ce_intent_to_add(active_cache[pos]))
+			return EXISTS_IN_INDEX;
+	}
 	if (cached)
 		return 0;
 
