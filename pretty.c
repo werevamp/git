@@ -723,6 +723,12 @@ static size_t format_person_part(struct strbuf *sb, char part,
 	case 'I':	/* date, ISO 8601 strict */
 		strbuf_addstr(sb, show_ident_date(&s, DATE_MODE(ISO8601_STRICT)));
 		return placeholder_len;
+	case 's':	/* date, short */
+		strbuf_addstr(sb, show_ident_date(&s, DATE_MODE(SHORT)));
+		return placeholder_len;
+	case 'R':	/* date, raw */
+		strbuf_addstr(sb, show_ident_date(&s, DATE_MODE(RAW)));
+		return placeholder_len;
 	}
 
 skip:
