@@ -406,6 +406,7 @@ Subject: re: [PATCH] another patch
 
 From: A U Thor <a.u.thor@example.com>
 Subject: [PATCH] another patch
+
 >Here is an empty patch from A U Thor.
 
 Hey you forgot the patch!
@@ -690,6 +691,23 @@ Date: Mon, 17 Sep 2012 14:23:44 -0700
 MIME-Version: 1.0
 Content-Type: text/plain; charset="iso-2022-jp"
 Content-type: text/plain; charset="UTF-8"
+
+New content here
+
+diff --git a/foo b/foo
+index e69de29..d95f3ad 100644
+--- a/foo
++++ b/foo
+@@ -0,0 +1 @@
++New content
+From nobody Mon Sep 17 00:00:00 2001
+From: A U Thor <a.u.thor@example.com>
+Subject: Re: some discussion title
+Date: Mon, 17 Sep 2012 14:23:49 -0700
+
+Subject: A E I O U
+MIME-VERSION: 1.0
+Garbage: Not a valid in-body header
 
 New content here
 
