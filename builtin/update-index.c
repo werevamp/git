@@ -473,7 +473,9 @@ static void read_index_info(int line_termination)
 	struct strbuf buf = STRBUF_INIT;
 	struct strbuf uq = STRBUF_INIT;
 
-	while (strbuf_getline(&buf, stdin, line_termination) != EOF) {
+	while ((line_termination
+		? strbuf_gets(&buf, stdin)
+		: strbuf_getline(&buf, stdin, '\0')) != EOF) {
 		char *ptr, *tab;
 		char *path_name;
 		unsigned char sha1[20];
