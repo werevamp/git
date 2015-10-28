@@ -157,7 +157,9 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 
 	while (!got_eof) {
 		while (1) {
-			if (strbuf_getline(&sb, stdin, line_termination) == EOF) {
+			if ((line_termination
+			     ? strbuf_gets(&sb, stdin)
+			     : strbuf_getline(&sb, stdin, '\0')) == EOF) {
 				got_eof = 1;
 				break;
 			}
