@@ -1075,7 +1075,10 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 		struct strbuf buf = STRBUF_INIT, nbuf = STRBUF_INIT;
 
 		setup_work_tree();
-		while (strbuf_getline(&buf, stdin, line_termination) != EOF) {
+
+		while ((line_termination
+			? strbuf_gets(&buf, stdin)
+			: strbuf_getline(&buf, stdin, '\0')) != EOF) {
 			char *p;
 			if (line_termination && buf.buf[0] == '"') {
 				strbuf_reset(&nbuf);
