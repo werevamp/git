@@ -122,7 +122,10 @@ static int check_ignore_stdin_paths(struct dir_struct *dir, const char *prefix)
 
 	strbuf_init(&buf, 0);
 	strbuf_init(&nbuf, 0);
-	while (strbuf_getline(&buf, stdin, line_termination) != EOF) {
+
+	while ((line_termination
+		? strbuf_gets(&buf, stdin)
+		: strbuf_getline(&buf, stdin, '\0')) != EOF) {
 		if (line_termination && buf.buf[0] == '"') {
 			strbuf_reset(&nbuf);
 			if (unquote_c_style(&nbuf, buf.buf, NULL))
