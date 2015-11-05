@@ -13,7 +13,7 @@ void child_process_init(struct child_process *child)
 	argv_array_init(&child->env_array);
 }
 
-static void child_process_deinit(struct child_process *child)
+void child_process_clear(struct child_process *child)
 {
 	argv_array_clear(&child->args);
 	argv_array_clear(&child->env_array);
@@ -335,7 +335,7 @@ int start_command(struct child_process *cmd)
 fail_pipe:
 			error("cannot create %s pipe for %s: %s",
 				str, cmd->argv[0], strerror(failed_errno));
-			child_process_deinit(cmd);
+			child_process_clear(cmd);
 			errno = failed_errno;
 			return -1;
 		}
@@ -520,7 +520,7 @@ fail_pipe:
 			close_pair(fderr);
 		else if (cmd->err)
 			close(cmd->err);
-		child_process_deinit(cmd);
+		child_process_clear(cmd);
 		errno = failed_errno;
 		return -1;
 	}
@@ -546,7 +546,7 @@ fail_pipe:
 int finish_command(struct child_process *cmd)
 {
 	int ret = wait_or_whine(cmd->pid, cmd->argv[0], 0);
-	child_process_deinit(cmd);
+	child_process_clear(cmd);
 	return ret;
 }
 
@@ -990,7 +990,7 @@ static void pp_cleanup(struct parallel_processes *pp)
 
 	for (i = 0; i < pp->max_processes; i++) {
 		strbuf_release(&pp->children[i].err);
-		child_process_deinit(&pp->children[i].process);
+		child_process_clear(&pp->children[i].process);
 	}
 
 	free(pp->children);
@@ -1144,7 +1144,7 @@ static int pp_collect_finished(struct parallel_processes *pp)
 		pp->nr_processes--;
 		pp->children[i].in_use = 0;
 		pp->pfd[i].fd = -1;
-		child_process_deinit(&pp->children[i].process);
+		child_process_clear(&pp->children[i].process);
 		child_process_init(&pp->children[i].process);
 
 		if (i != pp->output_owner) {
