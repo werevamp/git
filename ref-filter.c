@@ -37,6 +37,11 @@ static struct used_atom {
 	union {
 		const char *color;
 		struct align align;
+		struct {
+			unsigned int shorten : 1,
+				track : 1,
+				trackshort : 1;
+		} remote_ref;
 	} u;
 } *used_atom;
 static int used_atom_cnt, need_tagged, need_symref;
@@ -67,6 +72,24 @@ void color_atom_parser(struct used_atom *atom)
 	match_atom_name(atom->str, "color", &atom->u.color);
 	if (!atom->u.color)
 		die(_("expected format: %%(color:<color>)"));
+}
+
+void remote_ref_atom_parser(struct used_atom *atom)
+{
+	const char *buf;
+
+	buf = strchr(atom->str, ':');
+	if (!buf)
+		return;
+	buf++;
+	if (!strcmp(buf, "short"))
+		atom->u.remote_ref.shorten = 1;
+	else if (!strcmp(buf, "track"))
+		atom->u.remote_ref.track = 1;
+	else if (!strcmp(buf, "trackshort"))
+		atom->u.remote_ref.trackshort = 1;
+	else
+		die(_("improper format entered align:%s"), buf);
 }
 
 static align_type get_align_position(const char *type)
@@ -156,8 +179,8 @@ static struct {
 	{ "subject", FIELD_STR },
 	{ "body", FIELD_STR },
 	{ "contents", FIELD_STR },
-	{ "upstream", FIELD_STR },
-	{ "push", FIELD_STR },
+	{ "upstream", FIELD_STR, remote_ref_atom_parser },
+	{ "push", FIELD_STR, remote_ref_atom_parser },
 	{ "symref", FIELD_STR },
 	{ "flag", FIELD_STR },
 	{ "HEAD", FIELD_STR },
@@ -838,6 +861,42 @@ static inline char *copy_advance(char *dst, const char *src)
 	return dst;
 }
 
+static void fill_remote_ref_details(struct used_atom *atom, const char *refname,
+				    struct branch *branch, const char **s)
+{
+	int num_ours, num_theirs;
+	if (atom->u.remote_ref.shorten)
+		*s = shorten_unambiguous_ref(refname, warn_ambiguous_refs);
+	else if (atom->u.remote_ref.track) {
+		if (stat_tracking_info(branch, &num_ours,
+				       &num_theirs, NULL))
+			return;
+		if (!num_ours && !num_theirs)
+			*s = "";
+		else if (!num_ours)
+			*s = xstrfmt("[behind %d]", num_theirs);
+		else if (!num_theirs)
+			*s = xstrfmt("[ahead %d]", num_ours);
+		else
+			*s = xstrfmt("[ahead %d, behind %d]",
+				     num_ours, num_theirs);
+	} else if (atom->u.remote_ref.trackshort) {
+		if (stat_tracking_info(branch, &num_ours,
+				       &num_theirs, NULL))
+			return;
+
+		if (!num_ours && !num_theirs)
+			*s = "=";
+		else if (!num_ours)
+			*s = "<";
+		else if (!num_theirs)
+			*s = ">";
+		else
+			*s = "<>";
+	} else
+		*s = refname;
+}
+
 /*
  * Parse the object referred by ref, and grab needed value.
  */
@@ -892,6 +951,8 @@ static void populate_value(struct ref_array_item *ref)
 			refname = branch_get_upstream(branch, NULL);
 			if (!refname)
 				continue;
+			fill_remote_ref_details(atom, refname, branch, &v->s);
+			continue;
 		} else if (starts_with(name, "push")) {
 			const char *branch_name;
 			if (!skip_prefix(ref->refname, "refs/heads/",
@@ -902,6 +963,8 @@ static void populate_value(struct ref_array_item *ref)
 			refname = branch_get_push(branch, NULL);
 			if (!refname)
 				continue;
+			fill_remote_ref_details(atom, refname, branch, &v->s);
+			continue;
 		} else if (starts_with(name, "color")) {
 			char color[COLOR_MAXLEN] = "";
 			const char *valp = atom->u.color;
@@ -948,49 +1011,11 @@ static void populate_value(struct ref_array_item *ref)
 
 		formatp = strchr(name, ':');
 		if (formatp) {
-			int num_ours, num_theirs;
-
 			formatp++;
 			if (!strcmp(formatp, "short"))
 				refname = shorten_unambiguous_ref(refname,
 						      warn_ambiguous_refs);
-			else if (!strcmp(formatp, "track") &&
-				 (starts_with(name, "upstream") ||
-				  starts_with(name, "push"))) {
-
-				if (stat_tracking_info(branch, &num_ours,
-						       &num_theirs, NULL))
-					continue;
-
-				if (!num_ours && !num_theirs)
-					v->s = "";
-				else if (!num_ours)
-					v->s = xstrfmt("[behind %d]", num_theirs);
-				else if (!num_theirs)
-					v->s = xstrfmt("[ahead %d]", num_ours);
-				else
-					v->s = xstrfmt("[ahead %d, behind %d]",
-						       num_ours, num_theirs);
-				continue;
-			} else if (!strcmp(formatp, "trackshort") &&
-				   (starts_with(name, "upstream") ||
-				    starts_with(name, "push"))) {
-				assert(branch);
-
-				if (stat_tracking_info(branch, &num_ours,
-							&num_theirs, NULL))
-					continue;
-
-				if (!num_ours && !num_theirs)
-					v->s = "=";
-				else if (!num_ours)
-					v->s = "<";
-				else if (!num_theirs)
-					v->s = ">";
-				else
-					v->s = "<>";
-				continue;
-			} else
+			else
 				die("unknown %.*s format %s",
 				    (int)(formatp - name), name, formatp);
 		}
