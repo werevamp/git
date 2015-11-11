@@ -37,6 +37,10 @@ static int match_atom_name(const char *name, const char *atom_name, const char *
 {
 	const char *body;
 
+	/*  skip the deref specifier*/
+	if (name[0] == '*')
+		name++;
+
 	if (!skip_prefix(name, atom_name, &body))
 		return 0; /* doesn't even begin with "atom_name" */
 	if (!body[0]) {
