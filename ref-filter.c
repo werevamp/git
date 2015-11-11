@@ -29,6 +29,9 @@ typedef enum { FIELD_STR, FIELD_ULONG, FIELD_TIME } cmp_type;
 static struct used_atom {
 	const char *str;
 	cmp_type type;
+	union {
+		const char *color;
+	} u;
 } *used_atom;
 static int used_atom_cnt, need_tagged, need_symref;
 static int need_color_reset_at_eol;
@@ -51,6 +54,13 @@ static int match_atom_name(const char *name, const char *atom_name, const char *
 		return 0; /* "atom_namefoo" is not "atom_name" or "atom_name:..." */
 	*val = body + 1; /* "atom_name:val" */
 	return 1;
+}
+
+void color_atom_parser(struct used_atom *atom)
+{
+	match_atom_name(atom->str, "color", &atom->u.color);
+	if (!atom->u.color)
+		die(_("expected format: %%(color:<color>)"));
 }
 
 static struct {
@@ -90,7 +100,7 @@ static struct {
 	{ "symref", FIELD_STR },
 	{ "flag", FIELD_STR },
 	{ "HEAD", FIELD_STR },
-	{ "color", FIELD_STR },
+	{ "color", FIELD_STR, color_atom_parser },
 	{ "align", FIELD_STR },
 	{ "end", FIELD_STR },
 };
@@ -175,6 +185,9 @@ int parse_ref_filter_atom(const char *atom, const char *ep)
 	REALLOC_ARRAY(used_atom, used_atom_cnt);
 	used_atom[at].str = xmemdupz(atom, ep - atom);
 	used_atom[at].type = valid_atom[i].cmp_type;
+	memset(&used_atom[at].u, 0, sizeof(used_atom[at].u));
+	if (valid_atom[i].parser)
+		valid_atom[i].parser(&used_atom[at]);
 	if (*atom == '*')
 		need_tagged = 1;
 	if (!strcmp(used_atom[at].str, "symref"))
@@ -833,11 +846,10 @@ static void populate_value(struct ref_array_item *ref)
 			refname = branch_get_push(branch, NULL);
 			if (!refname)
 				continue;
-		} else if (match_atom_name(name, "color", &valp)) {
+		} else if (starts_with(name, "color")) {
 			char color[COLOR_MAXLEN] = "";
+			const char *valp = atom->u.color;
 
-			if (!valp)
-				die(_("expected format: %%(color:<color>)"));
 			if (color_parse(valp, color) < 0)
 				die(_("unable to parse format"));
 			v->s = xstrdup(color);
