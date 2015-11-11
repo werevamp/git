@@ -42,6 +42,14 @@ static struct used_atom {
 				track : 1,
 				trackshort : 1;
 		} remote_ref;
+		struct {
+			unsigned int subject : 1,
+				body : 1,
+				signature : 1,
+				all : 1,
+				lines : 1,
+				no_lines;
+		} contents;
 	} u;
 } *used_atom;
 static int used_atom_cnt, need_tagged, need_symref;
@@ -90,6 +98,29 @@ void remote_ref_atom_parser(struct used_atom *atom)
 		atom->u.remote_ref.trackshort = 1;
 	else
 		die(_("improper format entered align:%s"), buf);
+}
+
+void contents_atom_parser(struct used_atom *atom)
+{
+	const char * buf;
+
+	if (match_atom_name(atom->str, "contents", &buf))
+		atom->u.contents.all = 1;
+
+	if (!buf)
+		return;
+	if (!strcmp(buf, "body"))
+		atom->u.contents.body = 1;
+	else if (!strcmp(buf, "signature"))
+		atom->u.contents.signature = 1;
+	else if (!strcmp(buf, "subject"))
+		atom->u.contents.subject = 1;
+	else if (skip_prefix(buf, "lines=", &buf)) {
+		atom->u.contents.lines = 1;
+		if (strtoul_ui(buf, 10, &atom->u.contents.no_lines))
+			die(_("positive value expected contents:lines=%s"), buf);
+	} else
+		die(_("improper format entered contents:%s"), buf);
 }
 
 static align_type get_align_position(const char *type)
@@ -178,7 +209,7 @@ static struct {
 	{ "creatordate", FIELD_TIME },
 	{ "subject", FIELD_STR },
 	{ "body", FIELD_STR },
-	{ "contents", FIELD_STR },
+	{ "contents", FIELD_STR, contents_atom_parser },
 	{ "upstream", FIELD_STR, remote_ref_atom_parser },
 	{ "push", FIELD_STR, remote_ref_atom_parser },
 	{ "symref", FIELD_STR },
@@ -190,11 +221,6 @@ static struct {
 };
 
 #define REF_FORMATTING_STATE_INIT  { 0, NULL }
-
-struct contents {
-	unsigned int lines;
-	struct object_id oid;
-};
 
 struct ref_formatting_stack {
 	struct ref_formatting_stack *prev;
@@ -212,7 +238,6 @@ struct atom_value {
 	const char *s;
 	union {
 		struct align align;
-		struct contents contents;
 	} u;
 	void (*handler)(struct atom_value *atomv, struct ref_formatting_state *state);
 	unsigned long ul; /* used for sorting when not FIELD_STR */
@@ -761,20 +786,16 @@ static void grab_sub_body_contents(struct atom_value *val, int deref, struct obj
 	unsigned long sublen = 0, bodylen = 0, nonsiglen = 0, siglen = 0;
 
 	for (i = 0; i < used_atom_cnt; i++) {
-		const char *name = used_atom[i].str;
+		struct used_atom *atom = &used_atom[i];
+		const char *name = atom->str;
 		struct atom_value *v = &val[i];
-		const char *valp = NULL;
 		if (!!deref != (*name == '*'))
 			continue;
 		if (deref)
 			name++;
 		if (strcmp(name, "subject") &&
 		    strcmp(name, "body") &&
-		    strcmp(name, "contents") &&
-		    strcmp(name, "contents:subject") &&
-		    strcmp(name, "contents:body") &&
-		    strcmp(name, "contents:signature") &&
-		    !starts_with(name, "contents:lines="))
+		    !atom->u.contents.all)
 			continue;
 		if (!subpos)
 			find_subpos(buf, sz,
@@ -784,26 +805,23 @@ static void grab_sub_body_contents(struct atom_value *val, int deref, struct obj
 
 		if (!strcmp(name, "subject"))
 			v->s = copy_subject(subpos, sublen);
-		else if (!strcmp(name, "contents:subject"))
+		else if (atom->u.contents.subject)
 			v->s = copy_subject(subpos, sublen);
 		else if (!strcmp(name, "body"))
 			v->s = xmemdupz(bodypos, bodylen);
-		else if (!strcmp(name, "contents:body"))
+		else if (atom->u.contents.body)
 			v->s = xmemdupz(bodypos, nonsiglen);
-		else if (!strcmp(name, "contents:signature"))
+		else if (atom->u.contents.signature)
 			v->s = xmemdupz(sigpos, siglen);
-		else if (!strcmp(name, "contents"))
-			v->s = xstrdup(subpos);
-		else if (skip_prefix(name, "contents:lines=", &valp)) {
+		else if (atom->u.contents.lines) {
 			struct strbuf s = STRBUF_INIT;
 			const char *contents_end = bodylen + bodypos - siglen;
 
-			if (strtoul_ui(valp, 10, &v->u.contents.lines))
-				die(_("positive value expected contents:lines=%s"), valp);
 			/*  Size is the length of the message after removing the signature */
-			append_lines(&s, subpos, contents_end - subpos, v->u.contents.lines);
+			append_lines(&s, subpos, contents_end - subpos, atom->u.contents.no_lines);
 			v->s = strbuf_detach(&s, NULL);
-		}
+		} else /*  For %(contents) without modifiers */
+			v->s = xstrdup(subpos);
 	}
 }
 
