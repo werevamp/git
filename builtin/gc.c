@@ -58,8 +58,16 @@ static void clean_pack_garbage(void)
 
 static void report_pack_garbage(unsigned seen_bits, const char *path)
 {
-	if (seen_bits == PACKDIR_FILE_IDX)
-		string_list_append(&pack_garbage, path);
+	if (seen_bits & PACKDIR_FILE_IDX ||
+	    seen_bits & PACKDIR_FILE_BITMAP) {
+		const char *dot = strrchr(path, '.');
+		if (dot) {
+			int baselen = dot - path + 1;
+			if (!strcmp(path+baselen, "idx") ||
+				!strcmp(path+baselen, "bitmap"))
+				string_list_append(&pack_garbage, path);
+		}
+	}
 }
 
 static void git_config_date_string(const char *key, const char **output)
