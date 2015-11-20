@@ -255,7 +255,7 @@ test_expect_success 'rebase commit with an ancient timestamp' '
 	grep "author .* 34567 +0600$" actual
 '
 
-test_expect_failure 'rebase duplicated commit with --keep-empty' '
+test_expect_success 'rebase duplicated commit with --keep-empty' '
 	git reset --hard &&
 	git checkout master &&
 
