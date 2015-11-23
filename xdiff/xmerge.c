@@ -146,7 +146,7 @@ static int xdl_orig_copy(xdfenv_t *xe, int i, int count, int add_nl, char *dest)
 static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 			      xdfenv_t *xe2, const char *name2,
 			      const char *name3,
-			      int size, int i, int style,
+			      int size, int i, int style, int crlf,
 			      xdmerge_t *m, char *dest, int marker_size)
 {
 	int marker1_size = (name1 ? strlen(name1) + 1 : 0);
@@ -161,7 +161,7 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 			      dest ? dest + size : NULL);
 
 	if (!dest) {
-		size += marker_size + 1 + marker1_size;
+		size += marker_size + 1 + crlf + marker1_size;
 	} else {
 		memset(dest + size, '<', marker_size);
 		size += marker_size;
@@ -170,6 +170,8 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 			memcpy(dest + size + 1, name1, marker1_size - 1);
 			size += marker1_size;
 		}
+		if (crlf)
+			dest[size++] = '\r';
 		dest[size++] = '\n';
 	}
 
@@ -180,7 +182,7 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 	if (style == XDL_MERGE_DIFF3) {
 		/* Shared preimage */
 		if (!dest) {
-			size += marker_size + 1 + marker3_size;
+			size += marker_size + 1 + crlf + marker3_size;
 		} else {
 			memset(dest + size, '|', marker_size);
 			size += marker_size;
@@ -189,6 +191,8 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 				memcpy(dest + size + 1, name3, marker3_size - 1);
 				size += marker3_size;
 			}
+			if (crlf)
+				dest[size++] = '\r';
 			dest[size++] = '\n';
 		}
 		size += xdl_orig_copy(xe1, m->i0, m->chg0, 1,
@@ -196,10 +200,12 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 	}
 
 	if (!dest) {
-		size += marker_size + 1;
+		size += marker_size + 1 + crlf;
 	} else {
 		memset(dest + size, '=', marker_size);
 		size += marker_size;
+		if (crlf)
+			dest[size++] = '\r';
 		dest[size++] = '\n';
 	}
 
@@ -207,7 +213,7 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 	size += xdl_recs_copy(xe2, m->i2, m->chg2, 1,
 			      dest ? dest + size : NULL);
 	if (!dest) {
-		size += marker_size + 1 + marker2_size;
+		size += marker_size + 1 + crlf + marker2_size;
 	} else {
 		memset(dest + size, '>', marker_size);
 		size += marker_size;
@@ -216,6 +222,8 @@ static int fill_conflict_hunk(xdfenv_t *xe1, const char *name1,
 			memcpy(dest + size + 1, name2, marker2_size - 1);
 			size += marker2_size;
 		}
+		if (crlf)
+			dest[size++] = '\r';
 		dest[size++] = '\n';
 	}
 	return size;
@@ -226,7 +234,7 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 				 const char *ancestor_name,
 				 int favor,
 				 xdmerge_t *m, char *dest, int style,
-				 int marker_size)
+				 int crlf, int marker_size)
 {
 	int size, i;
 
@@ -237,8 +245,8 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 		if (m->mode == 0)
 			size = fill_conflict_hunk(xe1, name1, xe2, name2,
 						  ancestor_name,
-						  size, i, style, m, dest,
-						  marker_size);
+						  size, i, style, crlf, m,
+						  dest, marker_size);
 		else if (m->mode & 3) {
 			/* Before conflicting part */
 			size += xdl_recs_copy(xe1, i, m->i1 - i, 0,
@@ -419,6 +427,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 	int level = xmp->level;
 	int style = xmp->style;
 	int favor = xmp->favor;
+	int crlf = xmp->crlf;
 
 	if (style == XDL_MERGE_DIFF3) {
 		/*
@@ -554,7 +563,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 		int size = xdl_fill_merge_buffer(xe1, name1, xe2, name2,
 						 ancestor_name,
 						 favor, changes, NULL, style,
-						 marker_size);
+						 crlf, marker_size);
 		result->ptr = xdl_malloc(size);
 		if (!result->ptr) {
 			xdl_cleanup_merge(changes);
@@ -563,7 +572,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 		result->size = size;
 		xdl_fill_merge_buffer(xe1, name1, xe2, name2,
 				      ancestor_name, favor, changes,
-				      result->ptr, style, marker_size);
+				      result->ptr, style, crlf, marker_size);
 	}
 	return xdl_cleanup_merge(changes);
 }

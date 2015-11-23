@@ -122,6 +122,7 @@ typedef struct s_xmparam {
 	int level;
 	int favor;
 	int style;
+	int crlf;
 	const char *ancestor;	/* label for orig */
 	const char *file1;	/* label for mf1 */
 	const char *file2;	/* label for mf2 */

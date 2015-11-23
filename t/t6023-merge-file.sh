@@ -346,4 +346,11 @@ test_expect_success 'conflict at EOF without LF resolved by --union' \
 	 printf "line1\nline2\nline3x\nline3y" >expect.txt &&
 	 test_cmp expect.txt output.txt'
 
+
+test_expect_success 'conflict markers contain CRLF when core.eol=crlf' '
+	test_must_fail git -c core.eol=crlf merge-file -p \
+		nolf-diff1.txt nolf-orig.txt nolf-diff2.txt >output.txt &&
+	test $(sed -n "/\.txt\r$/p" output.txt | wc -l) = 3
+'
+
 test_done
