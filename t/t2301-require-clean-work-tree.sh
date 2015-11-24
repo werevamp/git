@@ -60,4 +60,33 @@ test_expect_success 'error on dirty index and work tree while on orphan branch' 
 	test_must_fail run_require_clean_work_tree
 '
 
+test_expect_success 'ORPHAN_OK - success on clean index and worktree while on orphan branch' '
+	test_when_finished "git checkout master" &&
+	git checkout --orphan orphan &&
+	git reset --hard &&
+	(
+		ORPHAN_OK=Yes &&
+		run_require_clean_work_tree
+	)
+'
+
+test_expect_success 'ORPHAN_OK - error on dirty index while on orphan branch' '
+	test_when_finished "git checkout master" &&
+	git checkout --orphan orphan &&
+	(
+		ORPHAN_OK=Yes &&
+		test_must_fail run_require_clean_work_tree
+	)
+'
+
+test_expect_success 'ORPHAN_OK - error on dirty index and worktree while on orphan branch' '
+	test_when_finished "git checkout master" &&
+	git checkout --orphan orphan &&
+	echo dirty >file &&
+	(
+		ORPHAN_OK=Yes &&
+		test_must_fail run_require_clean_work_tree
+	)
+'
+
 test_done
