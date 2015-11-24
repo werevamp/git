@@ -12,6 +12,7 @@ SYNOPSIS
 'git ls-files' [-z] [-t] [-v]
 		(--[cached|deleted|others|ignored|stage|unmerged|killed|modified])*
 		(-[c|d|o|i|s|u|k|m])*
+		[--eol]
 		[-x <pattern>|--exclude=<pattern>]
 		[-X <file>|--exclude-from=<file>]
 		[--exclude-per-directory=<file>]
@@ -147,6 +148,18 @@ a space) at the start of each line:
 	possible for manual inspection; the exact format may change at
 	any time.
 
+--eol::
+	Show line endings ("eolinfo") and the text/eol attributes ("texteolattr") of files.
+	"eolinfo" is the file content identification used by Git when
+	the "text" attribute is "auto", or core.autocrlf != false.
+
+	"eolinfo" is either "" (when the the info is not available"), or one of "binary",
+	"text-no-eol", "text-lf", "text-crlf" or "text-crlf-lf".
+	The "texteolattr" can be "", "-text", "text", "text=auto", "eol=lf", "eol=crlf".
+
+	Both the content in the index ("i/") and the content in the working tree ("w/")
+	are shown for regular files, followed by the "texteolattr ("attr/").
+
 \--::
 	Do not interpret any more arguments as options.
 
@@ -160,6 +173,15 @@ Output
 which case it outputs:
 
         [<tag> ]<mode> <object> <stage> <file>
+
+'git ls-files --eol' will show
+	i/<eolinfo> w/<eolinfo> attr/<eolattr> <file>
+
+'git ls-files --eol -o' will show
+	i/          w/<eolinfo> attr/<eolattr> <file>
+
+'git ls-files --eol -s' will show
+[<tag> ]<mode> <object> <stage> i/<eolinfo> w/<eolinfo> attr/<eolattr> <file>
 
 'git ls-files --unmerged' and 'git ls-files --stage' can be used to examine
 detailed information on unmerged paths.

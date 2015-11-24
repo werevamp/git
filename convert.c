@@ -13,6 +13,11 @@
  * translation when the "text" attribute or "auto_crlf" option is set.
  */
 
+/* Stat bits: When BIN is set, the txt bits are unset */
+#define CONVERT_STAT_BITS_TXT_LF   (1)
+#define CONVERT_STAT_BITS_TXT_CRLF (2)
+#define CONVERT_STAT_BITS_BIN      (4)
+
 enum crlf_action {
 	CRLF_GUESS = -1,
 	CRLF_BINARY = 0,
@@ -93,6 +98,63 @@ static int is_binary(unsigned long size, struct text_stat *stats)
 	 * want to support CR-only? Probably not.
 	 */
 	return 0;
+}
+
+static unsigned int gather_convert_stats(const char *data, unsigned long size)
+{
+	struct text_stat stats;
+	if (!data || !size)
+		return 0;
+	gather_stats(data, size, &stats);
+	if (is_binary(size, &stats) || stats.cr != stats.crlf)
+		return CONVERT_STAT_BITS_BIN;
+	else if (stats.crlf && (stats.crlf == stats.lf))
+		return CONVERT_STAT_BITS_TXT_CRLF;
+	else if (stats.crlf && stats.lf)
+		return CONVERT_STAT_BITS_TXT_CRLF | CONVERT_STAT_BITS_TXT_LF;
+	else if (stats.lf)
+		return CONVERT_STAT_BITS_TXT_LF;
+	else
+		return 0;
+}
+
+const char *gather_convert_stats_ascii(const char *data, unsigned long size)
+{
+	unsigned int convert_stats = gather_convert_stats(data, size);
+
+	if (convert_stats & CONVERT_STAT_BITS_BIN)
+		return "binary";
+	switch (convert_stats) {
+		case CONVERT_STAT_BITS_TXT_LF:
+			return("text-lf");
+		case CONVERT_STAT_BITS_TXT_CRLF:
+			return("text-crlf");
+		case CONVERT_STAT_BITS_TXT_LF | CONVERT_STAT_BITS_TXT_CRLF:
+			return("text-crlf-lf");
+		default:
+			return ("text-no-eol");
+	}
+}
+
+const char *get_cached_convert_stats_ascii(const char *path)
+{
+	const char *ret;
+	unsigned long sz;
+	void *data = read_blob_data_from_cache(path, &sz);
+	ret = gather_convert_stats_ascii(data, sz);
+	free(data);
+	return ret;
+}
+
+const char *get_wt_convert_stats_ascii(const char *path)
+{
+	const char *ret;
+	struct strbuf sb = STRBUF_INIT;
+	if (strbuf_read_file(&sb, path, 0) < 0)
+		return "";
+	ret = gather_convert_stats_ascii(sb.buf, sb.len);
+	strbuf_release(&sb);
+	return ret;
 }
 
 static enum eol output_eol(enum crlf_action crlf_action)
@@ -775,6 +837,30 @@ int would_convert_to_git_filter_fd(const char *path)
 		return 0;
 
 	return apply_filter(path, NULL, 0, -1, NULL, ca.drv->clean);
+}
+
+const char *get_convert_attr_ascii(const char *path)
+{
+	struct conv_attrs ca;
+	enum crlf_action crlf_action;
+
+	convert_attrs(&ca, path);
+	crlf_action = input_crlf_action(ca.crlf_action, ca.eol_attr);
+	switch (crlf_action) {
+		case CRLF_GUESS:
+			return "";
+		case CRLF_BINARY:
+			return "-text";
+		case CRLF_TEXT:
+			return "text";
+		case CRLF_INPUT:
+			return "eol=lf";
+		case CRLF_CRLF:
+			return "eol=crlf";
+		case CRLF_AUTO:
+			return "text=auto";
+	}
+	return "";
 }
 
 int convert_to_git(const char *path, const char *src, size_t len,
