@@ -50,6 +50,10 @@ static struct used_atom {
 				lines : 1,
 				no_lines;
 		} contents;
+		struct {
+			unsigned int shorten : 1,
+				full : 1;
+		} objectname;
 	} u;
 } *used_atom;
 static int used_atom_cnt, need_tagged, need_symref;
@@ -123,6 +127,21 @@ void contents_atom_parser(struct used_atom *atom)
 		die(_("improper format entered contents:%s"), buf);
 }
 
+void objectname_atom_parser(struct used_atom *atom)
+{
+	const char * buf;
+
+	if (match_atom_name(atom->str, "objectname", &buf))
+		atom->u.objectname.full = 1;
+
+	if (!buf)
+		return;
+	if (!strcmp(buf, "short"))
+		atom->u.objectname.shorten = 1;
+	else
+		die(_("improper format entered objectname:%s"), buf);
+}
+
 static align_type get_align_position(const char *type)
 {
 	if (!strcmp(type, "right"))
@@ -186,7 +205,7 @@ static struct {
 	{ "refname", FIELD_STR },
 	{ "objecttype", FIELD_STR },
 	{ "objectsize", FIELD_ULONG },
-	{ "objectname", FIELD_STR },
+	{ "objectname", FIELD_STR, objectname_atom_parser },
 	{ "tree", FIELD_STR },
 	{ "parent", FIELD_STR },
 	{ "numparent", FIELD_ULONG },
@@ -463,15 +482,16 @@ static void *get_obj(const unsigned char *sha1, struct object **obj, unsigned lo
 }
 
 static int grab_objectname(const char *name, const unsigned char *sha1,
-			    struct atom_value *v)
+			   struct atom_value *v, struct used_atom *atom)
 {
-	if (!strcmp(name, "objectname")) {
-		v->s = xstrdup(sha1_to_hex(sha1));
-		return 1;
-	}
-	if (!strcmp(name, "objectname:short")) {
-		v->s = xstrdup(find_unique_abbrev(sha1, DEFAULT_ABBREV));
-		return 1;
+	if (starts_with(name, "objectname")) {
+		if (atom->u.objectname.shorten) {
+			v->s = xstrdup(find_unique_abbrev(sha1, DEFAULT_ABBREV));
+			return 1;
+		} else if (atom->u.objectname.full) {
+			v->s = xstrdup(sha1_to_hex(sha1));
+			return 1;
+		}
 	}
 	return 0;
 }
@@ -495,7 +515,7 @@ static void grab_common_values(struct atom_value *val, int deref, struct object 
 			v->s = xstrfmt("%lu", sz);
 		}
 		else if (deref)
-			grab_objectname(name, obj->sha1, v);
+			grab_objectname(name, obj->sha1, v, &used_atom[i]);
 	}
 }
 
@@ -1004,7 +1024,7 @@ static void populate_value(struct ref_array_item *ref)
 				v->s = xstrdup(buf + 1);
 			}
 			continue;
-		} else if (!deref && grab_objectname(name, ref->objectname, v)) {
+		} else if (!deref && grab_objectname(name, ref->objectname, v, atom)) {
 			continue;
 		} else if (!strcmp(name, "HEAD")) {
 			const char *head;
