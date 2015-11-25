@@ -118,7 +118,7 @@ static unsigned int gather_convert_stats(const char *data, unsigned long size)
 		return 0;
 }
 
-const char *gather_convert_stats_ascii(const char *data, unsigned long size)
+static const char *gather_convert_stats_ascii(const char *data, unsigned long size)
 {
 	unsigned int convert_stats = gather_convert_stats(data, size);
 
