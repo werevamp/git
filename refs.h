@@ -502,6 +502,18 @@ extern int reflog_expire(const char *refname, const unsigned char *sha1,
 			 reflog_expiry_cleanup_fn cleanup_fn,
 			 void *policy_cb_data);
 
+struct refdb_config_data {
+	const char *refs_backend_type;
+	const char *refs_base;
+};
+/*
+ * Read the refdb configuration data out of the config file
+ */
+int refdb_config(const char *var, const char *value, void *ptr);
+
+struct ref_be;
 int set_refs_backend(const char *name, void *data);
+
+void register_refs_backend(struct ref_be *be);
 
 #endif /* REFS_H */

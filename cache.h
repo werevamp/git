@@ -696,6 +696,8 @@ extern enum object_creation_mode object_creation_mode;
 
 extern char *notes_ref_name;
 
+extern const char *refs_backend_type;
+
 extern int grafts_replace_parents;
 
 /*

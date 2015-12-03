@@ -1,5 +1,6 @@
 #include "cache.h"
 #include "dir.h"
+#include "refs.h"
 #include "string-list.h"
 
 static int inside_git_dir = -1;
@@ -261,6 +262,15 @@ int get_common_dir_noenv(struct strbuf *sb, const char *gitdir)
 	strbuf_release(&data);
 	strbuf_release(&path);
 	return ret;
+}
+
+int refdb_config(const char *var, const char *value, void *ptr)
+{
+       struct refdb_config_data *cdata = ptr;
+
+       if (!strcmp(var, "core.refsbackendtype"))
+	       cdata->refs_backend_type = xstrdup((char *)value);
+       return 0;
 }
 
 /*

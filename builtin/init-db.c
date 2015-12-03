@@ -204,6 +204,14 @@ static int create_default_files(const char *template_path)
 		adjust_shared_perm(get_git_dir());
 	}
 
+	if (refs_backend_type) {
+		struct refdb_config_data config_data = {NULL};
+		git_config_set("core.refsBackendType", refs_backend_type);
+		config_data.refs_backend_type = refs_backend_type;
+		config_data.refs_base = get_git_dir();
+		set_refs_backend(refs_backend_type, &config_data);
+	}
+
 	if (refs_init_db(&err, shared_repository))
 		die("failed to set up refs db: %s", err.buf);
 
@@ -469,6 +477,8 @@ int cmd_init_db(int argc, const char **argv, const char *prefix)
 		OPT_BIT('q', "quiet", &flags, N_("be quiet"), INIT_DB_QUIET),
 		OPT_STRING(0, "separate-git-dir", &real_git_dir, N_("gitdir"),
 			   N_("separate git dir from working tree")),
+		OPT_STRING(0, "refs-backend-type", &refs_backend_type,
+			   N_("name"), N_("name of backend type to use")),
 		OPT_END()
 	};
 

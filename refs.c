@@ -24,6 +24,14 @@ struct ref_be *the_refs_backend = &refs_be_files;
  */
 struct ref_be *refs_backends = &refs_be_files;
 
+const char *refs_backend_type;
+
+void register_refs_backend(struct ref_be *be)
+{
+	be->next = refs_backends;
+	refs_backends = be;
+}
+
 /*
  * This function is used to switch to an alternate backend.
  */
