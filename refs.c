@@ -9,6 +9,11 @@
 #include "object.h"
 #include "tag.h"
 
+const char split_transaction_fail_warning[] =
+	"A ref transaction was split across two refs backends.  Part of the "
+	"transaction succeeded, but then the update to the per-worktree refs "
+	"failed.  Your repository may be in an inconsistent state.";
+
 /*
  * We always have a files backend and it is the default.
  */
@@ -784,6 +789,13 @@ void ref_transaction_free(struct ref_transaction *transaction)
 	free(transaction);
 }
 
+static void add_update_obj(struct ref_transaction *transaction,
+			   struct ref_update *update)
+{
+	ALLOC_GROW(transaction->updates, transaction->nr + 1, transaction->alloc);
+	transaction->updates[transaction->nr++] = update;
+}
+
 static struct ref_update *add_update(struct ref_transaction *transaction,
 				     const char *refname)
 {
@@ -791,8 +803,7 @@ static struct ref_update *add_update(struct ref_transaction *transaction,
 	struct ref_update *update = xcalloc(1, sizeof(*update) + len);
 
 	memcpy((char *)update->refname, refname, len); /* includes NUL */
-	ALLOC_GROW(transaction->updates, transaction->nr + 1, transaction->alloc);
-	transaction->updates[transaction->nr++] = update;
+	add_update_obj(transaction, update);
 	return update;
 }
 
@@ -1121,11 +1132,87 @@ int refs_init_db(struct strbuf *err, int shared)
 	return the_refs_backend->init_db(err, shared);
 }
 
+/*
+ * Special case for non-normal refs.  For symbolic-refs when
+ * REF_NODEREF is not turned on, we dereference them here and replace
+ * updates to the symbolic refs with updates to the underlying ref.
+ * Then we do our own reflogging for the symbolic ref.
+ *
+ * We move other non-normal ref updates with into a specially-created
+ * files-backend transaction
+ */
+static int move_abnormal_ref_updates(struct ref_transaction *transaction,
+				     struct ref_transaction *files_transaction,
+				     struct string_list *symrefs)
+{
+	int i;
+
+	for (i = 0; i < transaction->nr; i++) {
+		struct ref_update *update = transaction->updates[i];
+		const char *resolved;
+		int flags = 0;
+		unsigned char sha1[20];
+
+		if (ref_type(update->refname) == REF_TYPE_NORMAL)
+			continue;
+
+		resolved = resolve_ref_unsafe(update->refname, 0, sha1, &flags);
+
+		if (update->flags & REF_NODEREF || !(flags & REF_ISSYMREF)) {
+			int last;
+
+			add_update_obj(files_transaction, update);
+			/*
+			 * Replace this transaction with the
+			 * last transaction, removing it from
+			 * the list of backend transactions
+			 */
+			last = --transaction->nr;
+			transaction->updates[i] = transaction->updates[last];
+			continue;
+		}
+
+		if (resolved) {
+			struct ref_update *new_update;
+			struct string_list_item *item;
+
+			if (ref_type(resolved) != REF_TYPE_NORMAL)
+				die("Non-normal symbolic ref `%s` points to non-normal ref `%s`", update->refname, resolved);
+
+			new_update = xmalloc(sizeof(*new_update) +
+					     strlen(resolved) + 1);
+			memcpy(new_update, update, sizeof(*update));
+
+			if (update->flags & REF_HAVE_OLD &&
+			    hashcmp(sha1, update->old_sha1)) {
+				/* consistency check failed */
+				free(new_update);
+				return -1;
+			} else {
+				hashcpy(update->old_sha1, sha1);
+			}
+
+			strcpy((char *)new_update->refname, resolved);
+			transaction->updates[i] = new_update;
+
+			item = string_list_append(symrefs, update->refname);
+			item->util = new_update;
+			free(update);
+		}
+	}
+
+	return 0;
+}
+
 int ref_transaction_commit(struct ref_transaction *transaction,
 			   struct strbuf *err)
 {
 	int ret = -1;
 	struct string_list affected_refnames = STRING_LIST_INIT_NODUP;
+	struct string_list files_affected_refnames = STRING_LIST_INIT_NODUP;
+	struct string_list symrefs = STRING_LIST_INIT_DUP;
+	struct string_list_item *item;
+	struct ref_transaction *files_transaction = NULL;
 
 	assert(err);
 
@@ -1137,6 +1224,26 @@ int ref_transaction_commit(struct ref_transaction *transaction,
 		return 0;
 	}
 
+	if (the_refs_backend != &refs_be_files) {
+		files_transaction = ref_transaction_begin(err);
+		if (!files_transaction)
+			die("%s", err->buf);
+
+		ret = move_abnormal_ref_updates(transaction, files_transaction,
+						&symrefs);
+		if (ret)
+			goto done;
+
+		/* files backend commit */
+		if (ref_update_reject_duplicates(files_transaction,
+						 &files_affected_refnames,
+						 err)) {
+			ret = TRANSACTION_GENERIC_ERROR;
+			goto done;
+		}
+	}
+
+	/* main backend commit */
 	if (ref_update_reject_duplicates(transaction, &affected_refnames, err)) {
 		ret = TRANSACTION_GENERIC_ERROR;
 		goto done;
@@ -1144,8 +1251,35 @@ int ref_transaction_commit(struct ref_transaction *transaction,
 
 	ret = the_refs_backend->transaction_commit(transaction,
 						   &affected_refnames, err);
+	if (ret)
+		goto done;
+
+	if (the_refs_backend != &refs_be_files) {
+		ret = refs_be_files.transaction_commit(files_transaction,
+						       &files_affected_refnames,
+						       err);
+		if (ret) {
+			warning(split_transaction_fail_warning);
+			goto done;
+		}
+
+		/* reflogging for dereferenced symbolic refs */
+		for_each_string_list_item(item, &symrefs) {
+			struct ref_update *update = item->util;
+			if (files_log_ref_write(item->string, update->old_sha1,
+						update->new_sha1,
+						update->msg, update->flags, err))
+				warning("failed to log ref update for symref %s",
+					item->string);
+		}
+	}
+
 done:
 	string_list_clear(&affected_refnames, 0);
+	string_list_clear(&files_affected_refnames, 0);
+	if (files_transaction)
+		ref_transaction_free(files_transaction);
+	string_list_clear(&symrefs, 0);
 	return ret;
 }
 
@@ -1201,6 +1335,9 @@ int peel_ref(const char *refname, unsigned char *sha1)
 int create_symref(const char *ref_target, const char *refs_heads_master,
 		  const char *logmsg)
 {
+	if (ref_type(ref_target) != REF_TYPE_NORMAL)
+		return refs_be_files.create_symref(ref_target, refs_heads_master,
+						   logmsg);
 	return the_refs_backend->create_symref(ref_target, refs_heads_master,
 					       logmsg);
 }
