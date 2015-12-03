@@ -3313,6 +3313,11 @@ static int ref_present(const char *refname,
 	return string_list_has_string(affected_refnames, refname);
 }
 
+void files_init_backend(void *data)
+{
+	/* do nothing */
+}
+
 static int files_initial_transaction_commit(struct ref_transaction *transaction,
 					    struct strbuf *err)
 {
@@ -3534,9 +3539,27 @@ static int files_reflog_expire(const char *refname, const unsigned char *sha1,
 	return -1;
 }
 
+static int files_init_db(struct strbuf *err, int shared)
+{
+	/*
+	 * Create .git/refs/{heads,tags}
+	 */
+	safe_create_dir(git_path("refs"), 1);
+	safe_create_dir(git_path("refs/heads"), 1);
+	safe_create_dir(git_path("refs/tags"), 1);
+	if (shared) {
+		adjust_shared_perm(git_path("refs"));
+		adjust_shared_perm(git_path("refs/heads"));
+		adjust_shared_perm(git_path("refs/tags"));
+	}
+	return 0;
+}
+
 struct ref_be refs_be_files = {
 	NULL,
 	"files",
+	files_init_backend,
+	files_init_db,
 	files_transaction_commit,
 	files_initial_transaction_commit,
 
