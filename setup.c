@@ -279,10 +279,11 @@ int refdb_config(const char *var, const char *value, void *ptr)
  *
  *  - either an objects/ directory _or_ the proper
  *    GIT_OBJECT_DIRECTORY environment variable
- *  - a refs/ directory
- *  - either a HEAD symlink or a HEAD file that is formatted as
- *    a proper "ref:", or a regular file HEAD that has a properly
- *    formatted sha1 object name.
+ *  - a refdb/ directory or
+ *    - a refs/ directory
+ *    - either a HEAD symlink or a HEAD file that is formatted as
+ *      a proper "ref:", or a regular file HEAD that has a properly
+ *      formatted sha1 object name.
  */
 int is_git_directory(const char *suspect)
 {
@@ -313,8 +314,13 @@ int is_git_directory(const char *suspect)
 
 	strbuf_setlen(&path, len);
 	strbuf_addstr(&path, "/refs");
-	if (access(path.buf, X_OK))
-		goto done;
+
+	if (access(path.buf, X_OK)) {
+		strbuf_setlen(&path, len);
+		strbuf_addstr(&path, "/refdb");
+		if (access(path.buf, X_OK))
+			goto done;
+	}
 
 	ret = 1;
 done:
@@ -383,6 +389,10 @@ static int check_repo_format(const char *var, const char *value, void *cb)
 			;
 		else if (!strcmp(ext, "preciousobjects"))
 			repository_format_precious_objects = git_config_bool(var, value);
+#ifdef USE_LIBLMDB
+		else if (!strcmp(ext, "refbackend") && !strcmp(value, "lmdb"))
+			;
+#endif
 		else
 			string_list_append(&unknown_extensions, ext);
 	}

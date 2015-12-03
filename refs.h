@@ -512,6 +512,7 @@ struct refdb_config_data {
 int refdb_config(const char *var, const char *value, void *ptr);
 
 struct ref_be;
+extern struct ref_be refs_be_lmdb;
 int set_refs_backend(const char *name, void *data);
 
 void register_refs_backend(struct ref_be *be);

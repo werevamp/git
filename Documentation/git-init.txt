@@ -115,7 +115,8 @@ does not exist, it will be created.
 
 --refs-backend-type=<name>::
 Type of refs backend. Default is to use the original "files" backend,
-which stores ref data in files in .git/refs and .git/packed-refs.
+which stores ref data in files in .git/refs and .git/packed-refs.  Set
+to "lmdb" to activate the lmdb database backend.
 
 TEMPLATE DIRECTORY
 ------------------

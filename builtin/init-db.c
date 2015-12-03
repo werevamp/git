@@ -179,6 +179,7 @@ static int create_default_files(const char *template_path)
 	int reinit;
 	int filemode;
 	struct strbuf err = STRBUF_INIT;
+	int repo_version = 0;
 
 	/* Just look for `init.templatedir` */
 	git_config(git_init_db_config, NULL);
@@ -209,7 +210,14 @@ static int create_default_files(const char *template_path)
 		git_config_set("core.refsBackendType", refs_backend_type);
 		config_data.refs_backend_type = refs_backend_type;
 		config_data.refs_base = get_git_dir();
+#ifdef USE_LIBLMDB
+		register_refs_backend(&refs_be_lmdb);
+#endif
 		set_refs_backend(refs_backend_type, &config_data);
+		if (!strcmp(refs_backend_type, "lmdb")) {
+			git_config_set("extensions.refbackend", "lmdb");
+			repo_version = 1;
+		}
 	}
 
 	if (refs_init_db(&err, shared_repository))
@@ -229,7 +237,7 @@ static int create_default_files(const char *template_path)
 
 	/* This forces creation of new config file */
 	xsnprintf(repo_version_string, sizeof(repo_version_string),
-		  "%d", GIT_REPO_VERSION);
+		  "%d", repo_version);
 	git_config_set("core.repositoryformatversion", repo_version_string);
 
 	/* Check filemode trustability */

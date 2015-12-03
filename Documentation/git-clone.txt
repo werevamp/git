@@ -224,7 +224,7 @@ objects from the source repository into a pack in the cloned repository.
 
 --refs-backend-type=<name>::
 	Type of refs backend. Default is to use the original files based
-	backend.
+	backend. Set to "lmdb" to activate the lmdb database backend.
 
 <repository>::
 	The (possibly remote) repository to clone from.  See the

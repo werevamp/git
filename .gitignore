@@ -199,6 +199,7 @@
 /test-path-utils
 /test-prio-queue
 /test-read-cache
+/test-refs-lmdb-backend
 /test-regex
 /test-revision-walking
 /test-run-command
