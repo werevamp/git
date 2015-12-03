@@ -92,11 +92,13 @@ static struct option builtin_clone_options[] = {
 		   N_("separate git dir from working tree")),
 	OPT_STRING_LIST('c', "config", &option_config, N_("key=value"),
 			N_("set config inside the new repository")),
+	OPT_STRING(0, "refs-backend-type", &refs_backend_type,
+		   N_("name"), N_("name of backend type to use")),
 	OPT_END()
 };
 
 static const char *argv_submodule[] = {
-	"submodule", "update", "--init", "--recursive", NULL
+	"submodule", "update", "--init", "--recursive", NULL, NULL
 };
 
 static const char *get_repo_path_1(struct strbuf *path, int *is_bundle)
@@ -724,8 +726,24 @@ static int checkout(void)
 	err |= run_hook_le(NULL, "post-checkout", sha1_to_hex(null_sha1),
 			   sha1_to_hex(sha1), "1", NULL);
 
-	if (!err && option_recursive)
+	if (!err && option_recursive) {
+		const char **backend_arg = argv_submodule;
+		char *new_backend_arg = NULL;
+		if (refs_backend_type) {
+			while (*backend_arg)
+				++backend_arg;
+
+			new_backend_arg = xmalloc(21 + strlen(refs_backend_type));
+			sprintf(new_backend_arg, "--refs-backend-type=%s",
+				refs_backend_type);
+			*backend_arg = new_backend_arg;
+		}
 		err = run_command_v_opt(argv_submodule, RUN_GIT_CMD);
+		if (refs_backend_type) {
+			free(new_backend_arg);
+			*backend_arg = NULL;
+		}
+	}
 
 	return err;
 }
@@ -744,6 +762,11 @@ static void write_config(struct string_list *config)
 					       write_one_config, NULL) < 0)
 			die("unable to write parameters to config file");
 	}
+
+	if (refs_backend_type &&
+	    write_one_config("core.refsBackendType",
+			     refs_backend_type, NULL) < 0)
+		die("unable to write backend parameter to config file");
 }
 
 static void write_refspec_config(const char *src_ref_prefix,
