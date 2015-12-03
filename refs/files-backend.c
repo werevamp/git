@@ -518,9 +518,6 @@ static void sort_ref_dir(struct ref_dir *dir)
 	dir->sorted = dir->nr = i;
 }
 
-/* Include broken references in a do_for_each_ref*() iteration: */
-#define DO_FOR_EACH_INCLUDE_BROKEN 0x01
-
 /*
  * Return true iff the reference described by entry can be resolved to
  * an object in the database.  Emit a warning if the referred-to
@@ -567,6 +564,10 @@ static int do_one_ref(struct ref_entry *entry, void *cb_data)
 	struct ref_entry_cb *data = cb_data;
 	struct ref_entry *old_current_ref;
 	int retval;
+
+	if (data->flags & DO_FOR_EACH_PER_WORKTREE_ONLY &&
+	    ref_type(entry->name) != REF_TYPE_PER_WORKTREE)
+		return 0;
 
 	if (!starts_with(entry->name, data->base))
 		return 0;
@@ -1736,6 +1737,14 @@ static int do_for_each_ref(struct ref_cache *refs, const char *base,
 		data.flags |= DO_FOR_EACH_INCLUDE_BROKEN;
 
 	return do_for_each_entry(refs, base, do_one_ref, &data);
+}
+
+int do_for_each_per_worktree_ref(const char *submodule, const char *base,
+				 each_ref_fn fn, int trim, int flags,
+				 void *cb_data)
+{
+	return do_for_each_ref(get_ref_cache(submodule), base, fn, trim,
+			       flags | DO_FOR_EACH_PER_WORKTREE_ONLY, cb_data);
 }
 
 static int do_head_ref(const char *submodule, each_ref_fn fn, void *cb_data)
