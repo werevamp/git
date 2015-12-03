@@ -218,6 +218,7 @@ int rename_ref_available(const char *oldname, const char *newname);
 typedef void ref_backend_init_fn(void *data);
 typedef int ref_backend_init_db_fn(struct strbuf *err, int shared);
 typedef int ref_transaction_commit_fn(struct ref_transaction *transaction,
+				      struct string_list *affected_refnames,
 				      struct strbuf *err);
 
 /* reflog functions */
