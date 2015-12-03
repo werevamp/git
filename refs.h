@@ -500,4 +500,6 @@ extern int reflog_expire(const char *refname, const unsigned char *sha1,
 			 reflog_expiry_cleanup_fn cleanup_fn,
 			 void *policy_cb_data);
 
+int set_refs_backend(const char *name);
+
 #endif /* REFS_H */

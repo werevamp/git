@@ -10,6 +10,31 @@
 #include "tag.h"
 
 /*
+ * We always have a files backend and it is the default.
+ */
+extern struct ref_be refs_be_files;
+struct ref_be *the_refs_backend = &refs_be_files;
+/*
+ * List of all available backends
+ */
+struct ref_be *refs_backends = &refs_be_files;
+
+/*
+ * This function is used to switch to an alternate backend.
+ */
+int set_refs_backend(const char *name)
+{
+	struct ref_be *be;
+
+	for (be = refs_backends; be; be = be->next)
+		if (!strcmp(be->name, name)) {
+			the_refs_backend = be;
+			return 0;
+		}
+	return 1;
+}
+
+/*
  * How to handle various characters in refnames:
  * 0: An acceptable character for refs
  * 1: End-of-component
@@ -1072,4 +1097,11 @@ int rename_ref_available(const char *oldname, const char *newname)
 	string_list_clear(&skip, 0);
 	strbuf_release(&err);
 	return ret;
+}
+
+/* backend functions */
+int ref_transaction_commit(struct ref_transaction *transaction,
+			   struct strbuf *err)
+{
+	return the_refs_backend->transaction_commit(transaction, err);
 }

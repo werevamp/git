@@ -197,4 +197,14 @@ const char *find_descendant_ref(const char *dirname,
 
 int rename_ref_available(const char *oldname, const char *newname);
 
+/* refs backends */
+typedef int ref_transaction_commit_fn(struct ref_transaction *transaction,
+				      struct strbuf *err);
+
+struct ref_be {
+	struct ref_be *next;
+	const char *name;
+	ref_transaction_commit_fn *transaction_commit;
+};
+
 #endif /* REFS_REFS_INTERNAL_H */
