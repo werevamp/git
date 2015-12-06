@@ -1431,4 +1431,10 @@ test_expect_success 'cover letter auto user override' '
 	test_line_count = 2 list
 '
 
+test_expect_success 'format-patch --no-hash' '
+	git format-patch --no-hash --stdout v2..v1 >patch2 &&
+	cnt=$(egrep "^From 0+ Mon Sep 17 00:00:00 2001" patch2 | wc -l) &&
+	test $cnt = 3
+'
+
 test_done
