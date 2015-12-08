@@ -1332,6 +1332,7 @@ Message-Id: $message_id
 			require Net::SMTP::SSL;
 			$smtp_domain ||= maildomain();
 			require IO::Socket::SSL;
+			$IO::Socket::SSL::DEBUG = 1;
 			# Net::SMTP::SSL->new() does not forward any SSL options
 			IO::Socket::SSL::set_client_defaults(
 				ssl_verify_params());
