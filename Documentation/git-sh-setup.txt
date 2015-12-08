@@ -25,7 +25,8 @@ Before sourcing it, your script should set up a few variables;
 `USAGE` (and `LONG_USAGE`, if any) is used to define message
 given by `usage()` shell function.  `SUBDIRECTORY_OK` can be set
 if the script can run from a subdirectory of the working tree
-(some commands do not).
+(some commands do not).  `ORPHAN_OK` can be set if the script can
+work on orphan branches.
 
 The scriptlet sets `GIT_DIR` and `GIT_OBJECT_DIRECTORY` shell
 variables, but does *not* export them to the environment.
