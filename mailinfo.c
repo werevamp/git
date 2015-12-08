@@ -628,17 +628,71 @@ static int is_scissors_line(const struct strbuf *line)
 		gap * 2 < perforation);
 }
 
+static int is_rfc2822_header(const struct strbuf *line)
+{
+	/*
+	 * The section that defines the loosest possible
+	 * field name is "3.6.8 Optional fields".
+	 *
+	 * optional-field = field-name ":" unstructured CRLF
+	 * field-name = 1*ftext
+	 * ftext = %d33-57 / %59-126
+	 */
+	int ch;
+	char *cp = line->buf;
+
+	/* Count mbox From headers as headers */
+	if (starts_with(cp, "From ") || starts_with(cp, ">From "))
+		return 1;
+
+	while ((ch = *cp++)) {
+		if (ch == ':')
+			return 1;
+		if ((33 <= ch && ch <= 57) ||
+		    (59 <= ch && ch <= 126))
+			continue;
+		break;
+	}
+	return 0;
+}
+
 static int handle_commit_msg(struct mailinfo *mi, struct strbuf *line)
 {
+	int is_empty_line;
+
 	assert(!mi->filter_stage);
 
-	if (mi->header_stage) {
-		if (!line->len || (line->len == 1 && line->buf[0] == '\n'))
+	is_empty_line = (!line->len || (line->len == 1 && line->buf[0] == '\n'));
+	if (mi->header_stage == 1) {
+		/*
+		 * Haven't seen a known in-body header; discard an empty line.
+		 */
+		if (is_empty_line)
 			return 0;
 	}
 
 	if (mi->use_inbody_headers && mi->header_stage) {
-		mi->header_stage = check_header(mi, line, mi->s_hdr_data, 0);
+		int is_known_header = check_header(mi, line, mi->s_hdr_data, 0);
+
+		if (mi->header_stage == 2) {
+			/*
+			 * an empty line after the in-body header block,
+			 * or a line obviously not an attempt to invent
+			 * an unsupported in-body header.
+			 */
+			if (is_empty_line || !is_rfc2822_header(line))
+				mi->header_stage = 0;
+			if (is_empty_line)
+				return 0;
+			/* otherwise do not discard the line, but keep going */
+		} else if (is_known_header) {
+			/* We know we are in the in-body header block now. */
+			mi->header_stage = 2;
+		} else if (mi->header_stage != 2) {
+			/* garbage and we are not in the in-body header block */
+			mi->header_stage = 0;
+		}
+
 		if (mi->header_stage)
 			return 0;
 	} else
@@ -697,34 +751,6 @@ static void handle_filter(struct mailinfo *mi, struct strbuf *line)
 		handle_patch(mi, line);
 		break;
 	}
-}
-
-static int is_rfc2822_header(const struct strbuf *line)
-{
-	/*
-	 * The section that defines the loosest possible
-	 * field name is "3.6.8 Optional fields".
-	 *
-	 * optional-field = field-name ":" unstructured CRLF
-	 * field-name = 1*ftext
-	 * ftext = %d33-57 / %59-126
-	 */
-	int ch;
-	char *cp = line->buf;
-
-	/* Count mbox From headers as headers */
-	if (starts_with(cp, "From ") || starts_with(cp, ">From "))
-		return 1;
-
-	while ((ch = *cp++)) {
-		if (ch == ':')
-			return 1;
-		if ((33 <= ch && ch <= 57) ||
-		    (59 <= ch && ch <= 126))
-			continue;
-		break;
-	}
-	return 0;
 }
 
 static int read_one_header_line(struct strbuf *line, FILE *in)
