@@ -25,14 +25,14 @@ static const char *env_names[] = {
 	GIT_PREFIX_ENVIRONMENT
 };
 static char *orig_env[4];
-static int saved_environment;
+static int saved_env_before_alias;
 
-static void save_env(void)
+static void save_env_before_alias(void)
 {
 	int i;
-	if (saved_environment)
+	if (saved_env_before_alias)
 		return;
-	saved_environment = 1;
+	saved_env_before_alias = 1;
 	orig_cwd = xgetcwd();
 	for (i = 0; i < ARRAY_SIZE(env_names); i++) {
 		orig_env[i] = getenv(env_names[i]);
@@ -233,6 +233,7 @@ static int handle_alias(int *argcp, const char ***argv)
 	char *alias_string;
 	int unused_nongit;
 
+	save_env_before_alias();
 	subdir = setup_git_directory_gently(&unused_nongit);
 
 	alias_command = (*argv)[0];
@@ -307,7 +308,6 @@ static int handle_alias(int *argcp, const char ***argv)
  * RUN_SETUP for reading from the configuration file.
  */
 #define NEED_WORK_TREE		(1<<3)
-#define NO_SETUP		(1<<4)
 
 struct cmd_struct {
 	const char *cmd;
@@ -389,7 +389,7 @@ static struct cmd_struct commands[] = {
 	{ "cherry", cmd_cherry, RUN_SETUP },
 	{ "cherry-pick", cmd_cherry_pick, RUN_SETUP | NEED_WORK_TREE },
 	{ "clean", cmd_clean, RUN_SETUP | NEED_WORK_TREE },
-	{ "clone", cmd_clone, NO_SETUP },
+	{ "clone", cmd_clone },
 	{ "column", cmd_column, RUN_SETUP_GENTLY },
 	{ "commit", cmd_commit, RUN_SETUP | NEED_WORK_TREE },
 	{ "commit-tree", cmd_commit_tree, RUN_SETUP },
@@ -415,8 +415,8 @@ static struct cmd_struct commands[] = {
 	{ "hash-object", cmd_hash_object },
 	{ "help", cmd_help },
 	{ "index-pack", cmd_index_pack, RUN_SETUP_GENTLY },
-	{ "init", cmd_init_db, NO_SETUP },
-	{ "init-db", cmd_init_db, NO_SETUP },
+	{ "init", cmd_init_db },
+	{ "init-db", cmd_init_db },
 	{ "interpret-trailers", cmd_interpret_trailers, RUN_SETUP_GENTLY },
 	{ "log", cmd_log, RUN_SETUP },
 	{ "ls-files", cmd_ls_files, RUN_SETUP },
@@ -530,7 +530,7 @@ static void handle_builtin(int argc, const char **argv)
 
 	builtin = get_builtin(cmd);
 	if (builtin) {
-		if (saved_environment && (builtin->option & NO_SETUP))
+		if (saved_env_before_alias)
 			restore_env();
 		else
 			exit(run_builtin(builtin, argc, argv));
@@ -590,7 +590,6 @@ static int run_argv(int *argcp, const char ***argv)
 		 */
 		if (done_alias)
 			break;
-		save_env();
 		if (!handle_alias(argcp, argv))
 			break;
 		done_alias = 1;
