@@ -56,21 +56,16 @@ create_gitattributes () {
 }
 
 create_NNO_files () {
-	lfname=$1
-	crlfname=$2
-	lfmixcrlf=$3
-	lfmixcr=$4
-	crlfnul=$5
 	for crlf in false true input
 	do
 		for attr in "" auto text -text lf crlf
 		do
 			pfx=NNO_${crlf}_attr_${attr} &&
-			cp $lfname    ${pfx}_LF.txt &&
-			cp $crlfname  ${pfx}_CRLF.txt &&
-			cp $lfmixcrlf ${pfx}_CRLF_mix_LF.txt &&
-			cp $lfmixcr   ${pfx}_LF_mix_CR.txt &&
-			cp $crlfnul   ${pfx}_CRLF_nul.txt
+			cp CRLF_mix_LF ${pfx}_LF.txt &&
+			cp CRLF_mix_LF ${pfx}_CRLF.txt &&
+			cp CRLF_mix_LF ${pfx}_CRLF_mix_LF.txt &&
+			cp CRLF_mix_LF ${pfx}_LF_mix_CR.txt &&
+			cp CRLF_mix_LF ${pfx}_CRLF_nul.txt
 		done
 	done
 }
@@ -96,7 +91,7 @@ commit_check_warn () {
 	crlfnul=$7
 	pfx=crlf_${crlf}_attr_${attr}
 	create_gitattributes "$attr" &&
-	for f in LF CRLF repoMIX LF_mix_CR CRLF_mix_LF LF_nul CRLF_nul
+	for f in LF CRLF LF_mix_CR CRLF_mix_LF LF_nul CRLF_nul
 	do
 		fname=${pfx}_$f.txt &&
 		cp $f $fname &&
@@ -147,6 +142,36 @@ commit_chk_wrnNNO () {
 	test_expect_success "commit NNO files crlf=$crlf attr=$attr CRLF_nul" '
 		check_warning "$crlfnul" ${pfx}_CRLF_nul.err
 	'
+}
+
+stats_ascii () {
+	case "$1" in
+		LF)
+		echo text-lf
+		;;
+		CRLF)
+		echo text-crlf
+		;;
+		CRLF_mix_LF)
+		echo text-crlf-lf
+		;;
+		LF_mix_CR)
+		echo binary
+		;;
+		CRLF_nul)
+		echo binary
+		;;
+		LF_nul)
+		echo binary
+		;;
+		CRLF_mix_CR)
+		echo binary
+		;;
+		*)
+		echo error_invalid $1
+		;;
+	esac
+
 }
 
 check_files_in_repo () {
@@ -213,7 +238,20 @@ checkout_files () {
 			git -c core.eol=$eol checkout $src$f.txt
 		fi
 	done
-
+	test_expect_success "ls-files --eol $lfname ${pfx}LF.txt" "
+		cat >e <<-EOF &&
+		i/text-crlf w/$(stats_ascii $crlfname) ${src}CRLF.txt
+		i/text-crlf-lf w/$(stats_ascii $lfmixcrlf) ${src}CRLF_mix_LF.txt
+		i/text-lf w/$(stats_ascii $lfname) ${src}LF.txt
+		i/binary w/$(stats_ascii $lfmixcr) ${src}LF_mix_CR.txt
+		i/binary w/$(stats_ascii $crlfnul) ${src}CRLF_nul.txt
+		i/binary w/$(stats_ascii $crlfnul) ${src}LF_nul.txt
+		EOF
+		sort <e >expect &&
+		git ls-files --eol $src* | sed -e 's!attr/[=a-z-]*!!g' -e 's/  */ /g' | sort >actual &&
+		test_cmp expect actual &&
+		rm e expect actual
+	"
 	test_expect_success "checkout core.eol=$eol core.autocrlf=$crlf gitattributes=$attr file=LF" "
 		compare_ws_file $pfx $lfname    ${src}LF.txt
 	"
@@ -230,6 +268,37 @@ checkout_files () {
 		compare_ws_file $pfx $crlfnul   ${src}LF_nul.txt
 	"
 }
+
+# Test control characters
+# NUL SOH CR EOF==^Z
+test_expect_success 'ls-files --eol -o Text/Binary' '
+	test_when_finished "rm e expect actual TeBi_*" &&
+	STRT=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA &&
+	STR=$STRT$STRT$STRT$STRT &&
+	printf "${STR}BBB\001" >TeBi_127_S &&
+	printf "${STR}BBBB\001">TeBi_128_S &&
+	printf "${STR}BBB\032" >TeBi_127_E &&
+	printf "\032${STR}BBB" >TeBi_E_127 &&
+	printf "${STR}BBBB\000">TeBi_128_N &&
+	printf "${STR}BBB\012">TeBi_128_L &&
+	printf "${STR}BBB\015">TeBi_127_C &&
+	printf "${STR}BB\015\012" >TeBi_126_CL &&
+	printf "${STR}BB\015\012\015" >TeBi_126_CLC &&
+	cat >e <<-EOF &&
+	i/ w/binary TeBi_127_S
+	i/ w/text-no-eol TeBi_128_S
+	i/ w/text-no-eol TeBi_127_E
+	i/ w/binary TeBi_E_127
+	i/ w/binary TeBi_128_N
+	i/ w/text-lf TeBi_128_L
+	i/ w/binary TeBi_127_C
+	i/ w/text-crlf TeBi_126_CL
+	i/ w/binary TeBi_126_CLC
+	EOF
+	sort <e >expect &&
+	git ls-files --eol -o | egrep "TeBi_" | sed -e 's!attr/[=a-z-]*!!g' -e "s/  */ /g" | sort >actual &&
+	test_cmp expect actual
+'
 
 #######
 test_expect_success 'setup master' '
@@ -479,5 +548,21 @@ checkout_files    native  false "lf"      LF    CRLF  CRLF_mix_LF  LF_mix_CR    
 checkout_files    native  true  "lf"      LF    CRLF  CRLF_mix_LF  LF_mix_CR    LF_nul
 checkout_files    native  false "crlf"    CRLF  CRLF  CRLF         CRLF_mix_CR  CRLF_nul
 checkout_files    native  true  "crlf"    CRLF  CRLF  CRLF         CRLF_mix_CR  CRLF_nul
+
+
+# Should be the last test case
+test_expect_success 'ls-files --eol -d' "
+	rm  crlf_false_attr__CRLF.txt crlf_false_attr__CRLF_mix_LF.txt crlf_false_attr__LF.txt .gitattributes &&
+	cat >expect <<-EOF &&
+	i/text-crlf w/ crlf_false_attr__CRLF.txt
+	i/text-crlf-lf w/ crlf_false_attr__CRLF_mix_LF.txt
+	i/text-lf w/ .gitattributes
+	i/text-lf w/ crlf_false_attr__LF.txt
+	EOF
+	git ls-files --eol -d | sed -e 's!attr/[=a-z-]*!!g' -e 's/  */ /g' | sort >actual &&
+	test_cmp expect actual &&
+	rm expect actual
+"
+
 
 test_done
