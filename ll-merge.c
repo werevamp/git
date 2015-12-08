@@ -111,6 +111,7 @@ static int ll_xdl_merge(const struct ll_merge_driver *drv_unused,
 		xmp.style = git_xmerge_style;
 	if (marker_size > 0)
 		xmp.marker_size = marker_size;
+	xmp.crlf = (core_eol == EOL_CRLF);
 	xmp.ancestor = orig_name;
 	xmp.file1 = name1;
 	xmp.file2 = name2;
