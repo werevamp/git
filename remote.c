@@ -256,7 +256,7 @@ static void read_remotes_file(struct remote *remote)
 	if (!f)
 		return;
 	remote->origin = REMOTE_REMOTES;
-	while (strbuf_getline(&buf, f, '\n') != EOF) {
+	while (strbuf_gets(&buf, f) != EOF) {
 		const char *v;
 
 		strbuf_rtrim(&buf);
