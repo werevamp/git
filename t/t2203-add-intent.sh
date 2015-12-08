@@ -82,5 +82,68 @@ test_expect_success 'cache-tree invalidates i-t-a paths' '
 	test_cmp expect actual
 '
 
+test_expect_success 'apply adds new file on i-t-a entry' '
+	git init apply &&
+	(
+		cd apply &&
+		echo newcontent >newfile &&
+		git add newfile &&
+		git diff --cached >patch &&
+		rm .git/index &&
+		git add -N newfile &&
+		git apply --cached patch
+	)
+'
+
+test_expect_success 'apply:check_preimage() not creating empty file' '
+	git init check-preimage &&
+	(
+		cd check-preimage &&
+		echo oldcontent >newfile &&
+		git add newfile &&
+		echo newcontent >newfile &&
+		git diff >patch &&
+		rm .git/index &&
+		git add -N newfile &&
+		rm newfile &&
+		test_must_fail git apply -3 patch &&
+		! test -f newfile
+	)
+'
+
+test_expect_success 'checkout ignores i-t-a' '
+	git init checkout &&
+	(
+		cd checkout &&
+		echo data >file &&
+		git add -N file &&
+		test_must_fail git checkout -- file &&
+		echo data >expected &&
+		test_cmp expected file
+	)
+'
+
+test_expect_success 'checkout-index ignores i-t-a' '
+	(
+		cd checkout &&
+		git checkout-index file &&
+		echo data >expected &&
+		test_cmp expected file
+	)
+'
+
+test_expect_success 'checkout-index --all ignores i-t-a' '
+	(
+		cd checkout &&
+		echo data >anotherfile &&
+		git add anotherfile &&
+		rm anotherfile &&
+		git checkout-index --all &&
+		echo data >expected &&
+		test_cmp expected file &&
+		test_cmp expected anotherfile
+	)
+'
+
 test_done
 

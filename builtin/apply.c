@@ -3344,7 +3344,7 @@ static int load_current(struct image *image, struct patch *patch)
 		die("BUG: patch to %s is not a creation", patch->old_name);
 
 	pos = cache_name_pos(name, strlen(name));
-	if (pos < 0)
+	if (pos < 0 || ce_intent_to_add(active_cache[pos]))
 		return error(_("%s: does not exist in index"), name);
 	ce = active_cache[pos];
 	if (lstat(name, &st)) {
@@ -3497,7 +3497,7 @@ static int check_preimage(struct patch *patch, struct cache_entry **ce, struct s
 
 	if (check_index && !previous) {
 		int pos = cache_name_pos(old_name, strlen(old_name));
-		if (pos < 0) {
+		if (pos < 0 || ce_intent_to_add(active_cache[pos])) {
 			if (patch->is_new < 0)
 				goto is_new;
 			return error(_("%s: does not exist in index"), old_name);
@@ -3549,10 +3549,11 @@ static int check_to_create(const char *new_name, int ok_if_exists)
 {
 	struct stat nst;
 
-	if (check_index &&
-	    cache_name_pos(new_name, strlen(new_name)) >= 0 &&
-	    !ok_if_exists)
-		return EXISTS_IN_INDEX;
+	if (check_index && !ok_if_exists) {
+		int pos = cache_name_pos(new_name, strlen(new_name));
+		if (pos >= 0 && !ce_intent_to_add(active_cache[pos]))
+			return EXISTS_IN_INDEX;
+	}
 	if (cached)
 		return 0;
 

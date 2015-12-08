@@ -56,7 +56,8 @@ static int checkout_file(const char *name, const char *prefix)
 	while (pos < active_nr) {
 		struct cache_entry *ce = active_cache[pos];
 		if (ce_namelen(ce) != namelen ||
-		    memcmp(ce->name, name, namelen))
+		    memcmp(ce->name, name, namelen) ||
+		    ce_intent_to_add(ce))
 			break;
 		has_same_name = 1;
 		pos++;
@@ -98,6 +99,8 @@ static void checkout_all(const char *prefix, int prefix_length)
 		struct cache_entry *ce = active_cache[i];
 		if (ce_stage(ce) != checkout_stage
 		    && (CHECKOUT_ALL != checkout_stage || !ce_stage(ce)))
+			continue;
+		if (ce_intent_to_add(ce))
 			continue;
 		if (prefix && *prefix &&
 		    (ce_namelen(ce) <= prefix_length ||
