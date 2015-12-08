@@ -1,0 +1,50 @@
+Notes on the LMDB refs backend
+==============================
+
+Design:
+------
+
+Refs and reflogs are stored in a lmdb database in .git/refdb.  All
+keys and values are \0-terminated.
+
+Keys for refs are the name of the ref (e.g. refs/heads/master).
+Values are the value of the ref, in hex
+(e.g. 61f23eb0f81357c19fa91e2b8c6f3906c3a8f9b0).
+
+All per-worktree refs (refs/bisect/* and HEAD) are store using
+the traditional files-based backend.
+
+Reflogs are stored as a series of database entries.
+
+For non-empty reflogs, there is one entry per logged ref
+update.  The key format is logs/[refname]\0[timestamp].  The timestamp
+is a 64-bit unsigned integer number of nanoseconds since 1/1/1970.
+This means that reflog entries are chronologically ordered.  Because
+LMDB is a btree database, we can efficiently iterate over these keys.
+
+For an empty reflog, there is a "header" entry to show that a reflog
+exists.  The header has the same format as an ordinary reflog, but with
+a timeztamp of all zeros and an empty value.
+
+Reflog values are in the same format as the original files-based
+reflog.
+
+Weaknesses:
+-----------
+
+The reflog format is somewhat inefficient: a binary format could store
+reflog date/time information in somewhat less space.
+
+The rsync and file:// transports don't work yet, because they
+don't use the refs API.
+
+git new-workdir is incompatible with the lmdb backend.  Fortunately,
+git new-workdir is deprecated, and worktrees work fine.
+
+LMDB locks the entire database for write.  Any other writer waits
+until the first writer is done before beginning.  Readers do not wait
+for writers, and writers do not wait for readers.  The underlying
+scheme is approximately MVCC; each reader's queries see the state of
+the database as-of the time that the reader acquired its read lock.
+This is not too far off from the files backend, which loads all refs
+into memory when one is requested.

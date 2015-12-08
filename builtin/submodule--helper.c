@@ -140,7 +140,10 @@ static int clone_submodule(const char *path, const char *gitdir, const char *url
 		argv_array_pushl(&cp.args, "--reference", reference, NULL);
 	if (gitdir && *gitdir)
 		argv_array_pushl(&cp.args, "--separate-git-dir", gitdir, NULL);
-
+	if (refs_backend_type && *refs_backend_type) {
+		argv_array_push(&cp.args, "--refs-backend-type");
+		argv_array_push(&cp.args, refs_backend_type);
+	}
 	argv_array_push(&cp.args, url);
 	argv_array_push(&cp.args, path);
 

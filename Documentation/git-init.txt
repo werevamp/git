@@ -12,7 +12,7 @@ SYNOPSIS
 'git init' [-q | --quiet] [--bare] [--template=<template_directory>]
 	  [--separate-git-dir <git dir>]
 	  [--shared[=<permissions>]] [directory]
-
+	  [--refs-backend-type=<name>]
 
 DESCRIPTION
 -----------
@@ -112,6 +112,11 @@ If you provide a 'directory', the command is run inside it. If this directory
 does not exist, it will be created.
 
 --
+
+--refs-backend-type=<name>::
+Type of refs backend. Default is to use the original "files" backend,
+which stores ref data in files in .git/refs and .git/packed-refs.  Set
+to "lmdb" to activate the lmdb database backend.
 
 TEMPLATE DIRECTORY
 ------------------

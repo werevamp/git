@@ -496,6 +496,13 @@ core.repositoryFormatVersion::
 	Internal variable identifying the repository format and layout
 	version.
 
+core.refsBackendType::
+	Type of refs backend. Default is to use the original files
+	based backend. Set to 'lmdb' to activate the lmdb database
+	backend.  If you use the lmdb backend,
+	core.repositoryFormatVersion must be set to 1, and
+	extensions.refBackend must be set to 'lmdb'.
+
 core.sharedRepository::
 	When 'group' (or 'true'), the repository is made shareable between
 	several users in a group (making sure all the files and objects are

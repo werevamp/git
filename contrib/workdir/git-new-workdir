@@ -28,6 +28,9 @@ git_dir=$(cd "$orig_git" 2>/dev/null &&
   git rev-parse --git-dir 2>/dev/null) ||
   die "Not a git repository: \"$orig_git\""
 
+
+test "$(git config core.refsbackendtype)" = "lmdb" && die "git-new-workdir is incompatible with the refs lmdb backend"
+
 case "$git_dir" in
 .git)
 	git_dir="$orig_git/.git"

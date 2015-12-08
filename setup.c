@@ -1,5 +1,6 @@
 #include "cache.h"
 #include "dir.h"
+#include "refs.h"
 #include "string-list.h"
 
 static int inside_git_dir = -1;
@@ -263,16 +264,26 @@ int get_common_dir_noenv(struct strbuf *sb, const char *gitdir)
 	return ret;
 }
 
+int refdb_config(const char *var, const char *value, void *ptr)
+{
+       struct refdb_config_data *cdata = ptr;
+
+       if (!strcmp(var, "core.refsbackendtype"))
+	       cdata->refs_backend_type = xstrdup((char *)value);
+       return 0;
+}
+
 /*
  * Test if it looks like we're at a git directory.
  * We want to see:
  *
  *  - either an objects/ directory _or_ the proper
  *    GIT_OBJECT_DIRECTORY environment variable
- *  - a refs/ directory
- *  - either a HEAD symlink or a HEAD file that is formatted as
- *    a proper "ref:", or a regular file HEAD that has a properly
- *    formatted sha1 object name.
+ *  - a refdb/ directory or
+ *    - a refs/ directory
+ *    - either a HEAD symlink or a HEAD file that is formatted as
+ *      a proper "ref:", or a regular file HEAD that has a properly
+ *      formatted sha1 object name.
  */
 int is_git_directory(const char *suspect)
 {
@@ -303,8 +314,13 @@ int is_git_directory(const char *suspect)
 
 	strbuf_setlen(&path, len);
 	strbuf_addstr(&path, "/refs");
-	if (access(path.buf, X_OK))
-		goto done;
+
+	if (access(path.buf, X_OK)) {
+		strbuf_setlen(&path, len);
+		strbuf_addstr(&path, "/refdb");
+		if (access(path.buf, X_OK))
+			goto done;
+	}
 
 	ret = 1;
 done:
@@ -373,6 +389,10 @@ static int check_repo_format(const char *var, const char *value, void *cb)
 			;
 		else if (!strcmp(ext, "preciousobjects"))
 			repository_format_precious_objects = git_config_bool(var, value);
+#ifdef USE_LIBLMDB
+		else if (!strcmp(ext, "refbackend") && !strcmp(value, "lmdb"))
+			;
+#endif
 		else
 			string_list_append(&unknown_extensions, ext);
 	}

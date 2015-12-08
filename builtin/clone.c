@@ -95,6 +95,8 @@ static struct option builtin_clone_options[] = {
 		   N_("separate git dir from working tree")),
 	OPT_STRING_LIST('c', "config", &option_config, N_("key=value"),
 			N_("set config inside the new repository")),
+	OPT_STRING(0, "refs-backend-type", &refs_backend_type,
+		   N_("name"), N_("name of backend type to use")),
 	OPT_END()
 };
 
@@ -725,11 +727,14 @@ static int checkout(void)
 
 	if (!err && option_recursive) {
 		struct argv_array args = ARGV_ARRAY_INIT;
+
 		argv_array_pushl(&args, "submodule", "update", "--init", "--recursive", NULL);
 
 		if (max_jobs != -1)
 			argv_array_pushf(&args, "--jobs=%d", max_jobs);
-
+		if (refs_backend_type)
+			argv_array_pushf(&args, "--refs-backend-type=%s",
+					 refs_backend_type);
 		err = run_command_v_opt(args.argv, RUN_GIT_CMD);
 		argv_array_clear(&args);
 	}
@@ -751,6 +756,11 @@ static void write_config(struct string_list *config)
 					       write_one_config, NULL) < 0)
 			die("unable to write parameters to config file");
 	}
+
+	if (refs_backend_type &&
+	    write_one_config("core.refsBackendType",
+			     refs_backend_type, NULL) < 0)
+		die("unable to write backend parameter to config file");
 }
 
 static void write_refspec_config(const char *src_ref_prefix,
