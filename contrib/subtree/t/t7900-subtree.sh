@@ -1014,4 +1014,56 @@ test_expect_success 'push split to subproj' '
 	)
 '
 
+test_expect_success 'subtree descendent check' '
+	mkdir git_subtree_split_check &&
+	(
+		cd git_subtree_split_check &&
+		git init &&
+
+		mkdir folder &&
+
+		echo a >folder/a &&
+		git add . &&
+		git commit -m "first commit" &&
+
+		git branch branch &&
+
+		echo 0 >folder/0 &&
+		git add . &&
+		git commit -m "adding 0 to folder" &&
+
+		echo b >folder/b &&
+		git add . &&
+		git commit -m "adding b to folder" &&
+		cherry=$(git rev-parse HEAD) &&
+
+		git checkout branch &&
+		echo text >textBranch.txt &&
+		git add . &&
+		git commit -m "commit to fiddle with branch: branch" &&
+
+		git cherry-pick $cherry &&
+		git checkout master &&
+		git merge -m "merge" branch &&
+
+		git branch noop_branch &&
+
+		echo d >folder/d &&
+		git add . &&
+		git commit -m "adding d to folder" &&
+
+		git checkout noop_branch &&
+		echo moreText >anotherText.txt &&
+		git add . &&
+		git commit -m "irrelevant" &&
+
+		git checkout master &&
+		git merge -m "second merge" noop_branch &&
+
+		git subtree split --prefix folder/ --branch subtree_tip master &&
+		git subtree split --prefix folder/ --branch subtree_branch branch &&
+		git push . subtree_tip:subtree_branch
+	)
+	'
+
 test_done
